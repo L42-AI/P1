@@ -22,84 +22,89 @@ You must encode:
 from typing import Tuple, Iterable
 import math
 
-def to_cnf(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
-    """
-    Read puzzle from input_path and return (clauses, num_vars).
+from typing import Tuple, Iterable, List
+import math
 
-    - clauses: iterable of iterables of ints (each clause), no trailing 0s
-    - num_vars: must be N^3 with N = grid size
-    """
-    grid = []
-    with open(input_path, "r") as sudoku:
-        for line in sudoku:
+def to_cnf(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
+    # Read puzzle
+    grid: List[List[int]] = []
+    with open(input_path, "r") as f:
+        for line in f:
             line = line.strip()
-            row = [int(x) for x in line.split()]
-            grid.append(row)
+            if not line:
+                continue
+            grid.append([int(x) for x in line.split()])
 
     N = len(grid)
-    B = int(math.sqrt(N))  # Box size
-    NUMBER_OF_VALUES = 9
+    assert all(len(r) == N for r in grid), "Input must be an N×N grid"
+    B = int(math.isqrt(N))
+    assert B * B == N, "N must be a perfect square (e.g., 9, 16, 25)"
 
-    print("N =", N, "B =", B)
+    def var_id(r: int, c: int, v: int) -> int:
+        # r,c in 0..N-1 ; v in 1..N
+        return r * N * N + c * N + v
 
-    # Make every variable unique
-    def var_id(row, column, value):
-      return row*N*N + column*N + value
+    clauses: List[List[int]] = []
 
-    clauses = [] # Represents all the disjunctions
+    def exactly_one(lits: List[int]) -> None:
+        # at least one
+        clauses.append(list(lits))
+        # at most one (pairwise)
+        for i in range(len(lits)):
+            for j in range(i + 1, len(lits)):
+                clauses.append([-lits[i], -lits[j]])
 
-    # Constraints
     # (1) Exactly one value per cell
-    def one_value_per_cell():
-        """
-        There are N*N cells and each cell can take 9 values (1 to 9).
-        So we create clauses to ensure that each cell has exactly one of the 9 value.
-        """
-        for r in range(N):
-            for c in range(N):
-                # At least one value in the cell
-                clause = [var_id(r, c, v) for v in range(NUMBER_OF_VALUES)]
-                clauses.append(clause)
-
-                # At most one value in the cell
-                for v1 in range(NUMBER_OF_VALUES):
-                    for v2 in range(v1 + 1, NUMBER_OF_VALUES):
-                        clauses.append([-var_id(r, c, v1), -var_id(r, c, v2)])
-
-    # (2) Row constraint
-    def row_constraint(r, v):
-        """
-        There are N rows and each row must contain each value v exactly once.
-        """
-
+    for r in range(N):
         for c in range(N):
-            clauses.append([var_id(r, c, v) for c in range(N)])
-    
-    def col_constraint(c, v):
-        """
-        There are N columns and each column must contain each value v exactly once.
-        """
+            exactly_one([var_id(r, c, v) for v in range(1, N + 1)])
+
+    # (2) Row: for each value v and each row r, exactly one column c has v
+    for v in range(1, N + 1):
         for r in range(N):
-            clauses.append([var_id(r, c, v) for r in range(N)])
+            exactly_one([var_id(r, c, v) for c in range(N)])
 
-    def box_constraint(br, bc, v):
-        """
-        There are B*B boxes and each box must contain each value v exactly once.
-        """
-        for i in range(B):
-            for j in range(B):
-                clauses.append([var_id(br*B + i, bc*B + j, v) for i in range(B) for j in range(B)])
-
-
-    # Call the functions to add constraints
-    one_value_per_cell()
-    for v in range(NUMBER_OF_VALUES):
-        for r in range(N):
-            row_constraint(r, v)
+    # (3) Column: for each value v and each column c, exactly one row r has v
+    for v in range(1, N + 1):
         for c in range(N):
-            col_constraint(c, v)
+            exactly_one([var_id(r, c, v) for r in range(N)])
+
+    # (4) Box: for each value v and each B×B box, exactly one cell has v
+    for v in range(1, N + 1):
         for br in range(B):
             for bc in range(B):
-                box_constraint(br, bc, v)
+                box_lits = []
+                for i in range(B):
+                    for j in range(B):
+                        r = br * B + i
+                        c = bc * B + j
+                        box_lits.append(var_id(r, c, v))
+                exactly_one(box_lits)
 
-    return clauses, N*N*NUMBER_OF_VALUES
+    # (5) Non-consecutive rule: orthogonal neighbors cannot differ by 1
+    # For each adjacent pair, forbid (r,c)=v together with neighbor = v±1
+    for r in range(N):
+        for c in range(N):
+            if c + 1 < N:
+                for v in range(1, N + 1):
+                    if v - 1 >= 1:
+                        clauses.append([-var_id(r, c, v), -var_id(r, c + 1, v - 1)])
+                    if v + 1 <= N:
+                        clauses.append([-var_id(r, c, v), -var_id(r, c + 1, v + 1)])
+            if r + 1 < N:
+                for v in range(1, N + 1):
+                    if v - 1 >= 1:
+                        clauses.append([-var_id(r, c, v), -var_id(r + 1, c, v - 1)])
+                    if v + 1 <= N:
+                        clauses.append([-var_id(r, c, v), -var_id(r + 1, c, v + 1)])
+
+    # (6) Clues: unit clauses for given digits
+    for r in range(N):
+        for c in range(N):
+            v = grid[r][c]
+            if v > 0:
+                clauses.append([var_id(r, c, v)])
+
+    num_vars = N ** 3
+    return clauses, num_vars
+
