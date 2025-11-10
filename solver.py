@@ -56,7 +56,7 @@ def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, Lis
         
         propogate(clauses, assignment)
 
-    def get_variable(clauses, assignment):
+    def get_variable(clauses, assignment): # TO BE IMPROVED WITH HEURISTIC
         for clause in clauses:
             for element in clause:
                 if assignment[abs(element)] == 0:
@@ -68,7 +68,7 @@ def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, Lis
                 return False
         return True
 
-    assignment = {var: 0 for var in range(1, num_vars + 1)}
+    assignment = {var: 0 for var in range(1, num_vars + 1)} # 0: None 1: True -1: False
 
     choices_made = {}
 
