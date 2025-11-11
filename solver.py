@@ -19,30 +19,9 @@ def flip(value: int) -> int:
     negated value (so flip(1) == -1 and flip(-1) == 1). The original code
     had a bug that always returned -1; we've fixed that to return -value.
     """
-    return -value
+    return -value 
 
-
-class DPLL:
-    """
-    Minimal DPLL-style SAT solver.
-
-    Attributes
-    - clauses: iterable of clauses; each clause is an iterable of ints where
-      a positive int x represents variable x, and negative int -x represents
-      ¬x.
-    - assignment: dict mapping variable index -> {0, 1, -1} where 0 is
-      unassigned, 1 is True, -1 is False.
-    - assignment_trail: deque recording the literal assignments in order. Values
-      pushed are signed integers representing the literal assigned (positive
-      means variable set True, negative means set False).
-
-    Limitations / TODOs
-    - No decision heuristic (no branching): this solver only performs unit
-      propagation and then checks for satisfaction. For many CNFs this will
-      not be sufficient to find a satisfying assignment.
-    - No conflict analysis or backtracking implemented.
-    """
-
+class SATSolver:
     def __init__(self, clauses: Clauses, num_vars: int):
         # Keep the clauses reference. Clauses may be any iterable of iterables.
         self.clauses = clauses
@@ -64,7 +43,7 @@ class DPLL:
         """
         self.assignment[abs(variable)] = value
         self.assignment_trail.append(abs(variable) * value)
-
+    
     def element_true(self, variable: int) -> bool:
         """
         Return True if the literal `variable` is currently satisfied by the
@@ -107,6 +86,30 @@ class DPLL:
                 pending_variables.add(element)
 
         return pending_variables
+    
+class CDCL(SATSolver):
+    pass
+
+class DPLL(SATSolver):
+    """
+    Minimal DPLL-style SAT solver.
+
+    Attributes
+    - clauses: iterable of clauses; each clause is an iterable of ints where
+      a positive int x represents variable x, and negative int -x represents
+      ¬x.
+    - assignment: dict mapping variable index -> {0, 1, -1} where 0 is
+      unassigned, 1 is True, -1 is False.
+    - assignment_trail: deque recording the literal assignments in order. Values
+      pushed are signed integers representing the literal assigned (positive
+      means variable set True, negative means set False).
+
+    Limitations / TODOs
+    - No decision heuristic (no branching): this solver only performs unit
+      propagation and then checks for satisfaction. For many CNFs this will
+      not be sufficient to find a satisfying assignment.
+    - No conflict analysis or backtracking implemented.
+    """
 
     def propagate(self):
         """
