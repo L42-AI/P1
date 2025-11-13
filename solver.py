@@ -33,6 +33,12 @@ class SATSolver:
         # -3 means var 3 set False). This can be used later for backtracking.
         self.assignment_trail = deque()
 
+                # Stores the trial index where each decision level starts
+        self.level_start = []
+
+        # stores the decision literals chosen at each level
+        self.decisions = []
+
     def _assign(self, variable: int, value: int):
         """
         Assign a variable to a value (1 or -1).
@@ -119,27 +125,31 @@ class DPLL(SATSolver):
         literal then that literal must be set to make the clause true. We
         iterate until no new propagation occurs.
         """
-        must_propagate = False
-        for clause in self.clauses:
-            # If the clause is already satisfied, skip it.
-            if self.clause_is_true(clause):
-                continue
+        while True:
+            must_propagate = False
 
-            pending_variables = self.get_pending_variables(clause)
+            for clause in self.clauses:
+            # If the clause is already satisfied, skip it.
+                if self.clause_is_true(clause):
+                    continue
+
+                pending_variables = self.get_pending_variables(clause)
 
             # If a clause has exactly one pending literal, that literal must
             # become True (so assign it accordingly). We translate the signed
             # literal to a stored value: literal < 0 -> assign -1, else 1.
-            if len(pending_variables) == 1:
-                v = list(pending_variables)[0]
-                self._assign(v, -1 if v < 0 else 1)
-                must_propagate = True
-
-        # Recurse/loop until no more unit propagation is possible.
-        if not must_propagate:
-            return
-
-        self.propagate()
+                if len(pending_variables) == 1:
+                    v = list(pending_variables)[0]
+                    self._assign(v, -1 if v < 0 else 1)
+                    must_propagate = True
+            
+                if len(pending_variables) == 0:
+                # then tehre is a conflict as all literals are assigned false --> Must trigger backtracking
+                    return(False)
+            
+            # Recurse/loop until no more unit propagation is possible --> We are at the fixed point
+            if not must_propagate:
+                return True
 
     def is_solved(self) -> bool:
         """
@@ -154,6 +164,76 @@ class DPLL(SATSolver):
                 return False
         return True
 
+    def pick_unassigned_literal(self) -> int | None:
+        """
+        Pick an unassigned literal to branch on. This is where a decision for the value/cell starts
+
+        This chooses the first unassigned variable and returns it as a positive literal. 
+        Very simple, can be improved later
+        """
+        for var in self.assignment:
+            if self.assignment[var] == 0:
+                return var  # Return as positive literal
+        return None  # All variables are assigned
+
+    
+    def push_decision_level(self, lit: int):
+        """
+        Start a new decision level with the given literal
+        Where this level starts on the trial is noted and the decision literal is stored and assigned its value/sign
+        """
+        # Know where level starts in the assignment trail
+        self.level_start.append(len(self.assignment_trail))
+
+        # Remember the deicision literal
+        var = abs(lit)
+        tried_false = (lit < 0) # if literal is negative, we are trying false first
+        self.decisions.append({'var': var, 'tried_false': tried_false})
+
+        # ASsign the decision literal the correct sign
+        val = 1 if lit > 0 else -1
+        self._assign(lit, val)
+
+    
+    def backtrack(self) -> bool:
+        """
+        Backtrack to the previous decision level.
+        If last decision still has an untried opposite branch, flip to false and return true.
+        If no more decisions, return false as it is UNSAT
+
+        1. Undo the decisions start
+        2. if the false branch not tried, we re push this decision with tried_false = true and assign var = False and let it propagte again
+        3. Else keep going back up
+        """
+        if not self.decisions:
+            return False  # nothing to backtrack as UNSAT
+        
+        # Pop last decision and its level start
+        decision = self.decisions.pop()
+        level_start_index = self.level_start.pop()
+
+        # Undo assignments at and after this level start
+        while len(self.assignment_trail) > level_start_index:
+            lit = self.assignment_trail.pop()
+            self.assignment[abs(lit)] = 0  # unassign
+
+        # If we have not tried teh False decision, do it now
+        if not decision['tried_false']:
+            # introduce level for this flipped decision
+            self.level_start.append(len(self.assignment_trail))
+            decision['tried_false'] = True
+            self.decisions.append(decision)
+
+            # Assign the var to false (negative literal)
+            var = decision['var']
+            self._assign(-var, -1)
+            return True  # backtrack successful, flipped decision
+        
+        # Both decision tried, go back further with backtracking
+        return self.backtrack()
+        
+
+    
     def solve(self) -> Tuple[str, List[int] | None]:
         """
         Attempt to solve the CNF using unit propagation only.
@@ -164,26 +244,39 @@ class DPLL(SATSolver):
           assignment is found.
         - ('UNSAT', None) if unsatisfiable.
 
-        Note: This method currently does not implement a full DPLL search
-        (no decisions/backtracking). It only applies unit propagation and
-        then tests for satisfaction. For many CNFs this will return no result
-        even though the CNF is satisfiable; extending this to a full DPLL
-        search is a recommended next step.
+        Full DPLL loop starting with uni propagation at level 0, if it is not solved, pick unassigned literal to branch on, push decision level and propagate again.
+        If there is a conflict during propagation, backtrack one level/flip the sign and prop again
         """
-        is_solved = False
-        must_propagate = True
-        while not is_solved:
-
-            if must_propagate:
-                self.propagate()
-                must_propagate = False
-
+        # initial propogation at level 0 for unit clauses
+        if not self.propagate():
+            return 'UNSAT', None
+        
+        while True:
+            # If solved, return the model
             if self.is_solved():
-                is_solved = True
+                true_vars = [i for i, v in self.assignment.items() if v == 1]
+                return 'SAT', true_vars
+            
+            # Pick a decision literal post. var
+            decision_lit = self.pick_unassigned_literal()
+            if decision_lit is None:
+                # all assigned but not solved, so it UNSAT
+                return 'UNSAT', None
+            
+            # Decide post. var and propagate
+            self.push_decision_level(decision_lit)
+            if self.propagate():
+                continue  # no conflict, keep searching
 
-        # Build a simple model listing variables set to True.
-        true_vars = [i for i, v in self.assignment.items() if v == 1]
-        return 'SAT', true_vars
+            # Conflict due to propagation, backtrack until flip or no more decisions
+            while True:
+                flipped = self.backtrack()
+                if not flipped:
+                    return 'UNSAT', None  # no more decisions to backtrack, UNSAT
+                
+                if self.propagate():
+                    break  # flipped branch is successful with backtrack and propagate, continue main loop
+
 
 
 def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, List[int] | None]:
