@@ -9,6 +9,7 @@ from typing import Iterable, List, Tuple
 
 from utils.visualize_sudoku import visualize_sudoku
 from utils.cdcl import CDCL
+from utils.dpll import DPLL
 
 def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, List[int] | None]:
     """
