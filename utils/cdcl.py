@@ -63,6 +63,13 @@ class CDCL(SATSolver):
 
     # --- 2. Core CDCL Components ---
 
+    def _assign_internal(self, lit: int, level: int, reason: int | None):
+        """Helper to set CDCL bookkeeping and call assign()."""
+        var = abs(lit)
+        self.level_of[var] = level
+        self.reason_of[var] = reason
+        self.assign(lit, 1 if lit > 0 else -1)
+
     def propagate(self) -> int | None:
         """
         Performs 2WL unit propagation and records CDCL bookkeeping.
@@ -76,20 +83,17 @@ class CDCL(SATSolver):
         """
         current_level = self.get_current_level()
         
-        # 1. Process initial unit clauses (level 0)
+        # 1. Initial unit clauses (root-level)
         while self.unit_clause_lits:
             lit = self.unit_clause_lits.popleft()
             if self.lit_is_true(lit):
                 continue
             if self.lit_is_false(lit):
-                return -1 # Root conflict (use a dummy index)
+                return -1 # Conflict (use a dummy index)
             
-            var = abs(lit)
-            self.level_of[var] = 0 # Root level
-            self.reason_of[var] = None # No reason
-            self.assign(lit, 1 if lit > 0 else -1)
+            self._assign_internal(lit, 0, None)
 
-        # 2. Process the main assignment trail (the "queue")
+        # 2. Main propagation over the trail
         while self.prop_index < len(self.assignment_trail):
             lit = self.assignment_trail[self.prop_index]
             self.prop_index += 1
@@ -97,8 +101,8 @@ class CDCL(SATSolver):
             
             for ci in list(self.watches[falsified_lit]):
                 clause = self.clauses[ci]
+                # ensure clause[0] is the falsified watch
                 w1, w2 = clause[0], clause[1]
-                
                 if w1 != falsified_lit:
                     w1, w2 = w2, w1
                     clause[0], clause[1] = w1, w2
@@ -122,10 +126,7 @@ class CDCL(SATSolver):
                 # No new watcher found
                 if self.lit_is_unassigned(w2):
                     # Unit clause! Propagate w2.
-                    var = abs(w2)
-                    self.reason_of[var] = ci # Record the reason
-                    self.level_of[var] = current_level # Record the level
-                    self.assign(w2, 1 if w2 > 0 else -1)
+                    self._assign_internal(w2, current_level, ci)
                 
                 elif self.lit_is_false(w2):
                     # Conflict!
@@ -205,7 +206,6 @@ class CDCL(SATSolver):
             
             # --- 4. Resolve: Add reason clause lits ---
             reason_ci = self.reason_of[var_on_trail]
-            assert reason_ci is not None
             
             for r_lit in self.clauses[reason_ci]:
                 r_var = abs(r_lit)
