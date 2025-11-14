@@ -69,7 +69,56 @@ class SATSolver:
         return self.assignment[abs(lit)] == 0
 
     def pick_unassigned_literal(self) -> int | None:
-        for var in self.assignment:
-            if self.assignment[var] == 0:
-                return var  # Return as positive literal
-        return None  # All variables are assigned
+        """
+        Kies een decision literal met een simpele DLCS-achtige heuristic:
+
+        - Voor elke on-geassigneerde variabele v:
+            * tel hoe vaak v positief voorkomt in nog niet-gesatisficede clauses
+            * tel hoe vaak v negatief voorkomt in nog niet-gesatisficede clauses
+            * score = pos + neg
+        - Kies v met grootste score.
+        - Kies sign:
+            * als pos >= neg -> literal = +v
+            * anders -> literal = -v
+
+        Geeft een literal (met sign) terug, of None als alles al geassignd is.
+        """
+
+        best_var: int | None = None
+        best_score = -1
+        best_sign = 1  # 1 = positief, -1 = negatief
+
+        for var, val in self.assignment.items():
+            if val != 0:
+                continue  # al geassignd
+
+            pos = 0
+            neg = 0
+
+            # Loop over clauses en tel alleen in clauses die nog niet satisfied zijn
+            for clause in self.clauses:
+                # als clause al satisfied is, heeft hij geen impact meer
+                if any(self.lit_is_true(l) for l in clause):
+                    continue
+
+                for lit in clause:
+                    if abs(lit) != var:
+                        continue
+                    if lit > 0:
+                        pos += 1
+                    else:
+                        neg += 1
+
+            score = pos + neg
+            if score > best_score:
+                best_score = score
+                best_var = var
+                best_sign = 1 if pos >= neg else -1
+
+        if best_var is None:
+            # geen on-geassigneerde variabelen meer
+            return None
+
+        # Geef een literal terug, niet alleen de variabele:
+        return best_var if best_sign == 1 else -best_var
+
