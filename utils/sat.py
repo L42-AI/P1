@@ -38,6 +38,14 @@ class SATSolver:
             self.watches[w1].append(ci)
             self.watches[w2].append(ci)
 
+        # Precompute hoe vaak elke variabele voorkomt (positief + negatief)
+        self.var_frequency: dict[int, int] = {i: 0 for i in range(1, num_vars + 1)}
+        for clause in self.clauses:
+            for lit in clause:
+                v = abs(lit)
+                self.var_frequency[v] += 1
+
+
 
     def assign(self, variable: int, value: int):
         self.assignment[abs(variable)] = value
@@ -70,55 +78,26 @@ class SATSolver:
 
     def pick_unassigned_literal(self) -> int | None:
         """
-        Kies een decision literal met een simpele DLCS-achtige heuristic:
-
-        - Voor elke on-geassigneerde variabele v:
-            * tel hoe vaak v positief voorkomt in nog niet-gesatisficede clauses
-            * tel hoe vaak v negatief voorkomt in nog niet-gesatisficede clauses
-            * score = pos + neg
-        - Kies v met grootste score.
-        - Kies sign:
-            * als pos >= neg -> literal = +v
-            * anders -> literal = -v
-
-        Geeft een literal (met sign) terug, of None als alles al geassignd is.
+        Goedkope heuristic:
+        - kies de nog niet geassigneerde variabele met de hoogste var_frequency
+          (dus die in de meeste clauses voorkomt).
+        - we nemen gewoon de positieve literal (True) als eerste keuze.
         """
 
-        best_var: int | None = None
+        best_var = None
         best_score = -1
-        best_sign = 1  # 1 = positief, -1 = negatief
 
         for var, val in self.assignment.items():
             if val != 0:
-                continue  # al geassignd
+                continue  # al geassigned
 
-            pos = 0
-            neg = 0
-
-            # Loop over clauses en tel alleen in clauses die nog niet satisfied zijn
-            for clause in self.clauses:
-                # als clause al satisfied is, heeft hij geen impact meer
-                if any(self.lit_is_true(l) for l in clause):
-                    continue
-
-                for lit in clause:
-                    if abs(lit) != var:
-                        continue
-                    if lit > 0:
-                        pos += 1
-                    else:
-                        neg += 1
-
-            score = pos + neg
+            score = self.var_frequency.get(var, 0)
             if score > best_score:
                 best_score = score
                 best_var = var
-                best_sign = 1 if pos >= neg else -1
 
         if best_var is None:
-            # geen on-geassigneerde variabelen meer
-            return None
+            return None  # alles geassigned
 
-        # Geef een literal terug, niet alleen de variabele:
-        return best_var if best_sign == 1 else -best_var
+        return best_var  # positieve literal als decision
 

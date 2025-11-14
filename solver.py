@@ -25,5 +25,5 @@ def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, Lis
 
     if solved == 'SAT':
         n = int(round(num_vars ** (1/3)))
-        visualize_sudoku(result, n)
+        #visualize_sudoku(result, n)
     return solved, result
