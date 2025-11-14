@@ -16,7 +16,7 @@ class SATSolver:
         self.unit_clause_lits = deque()
         self.prop_index = 0
 
-        self.progress_bar = ProgressBar(num_vars, on=True)
+        self.progress_bar = ProgressBar(num_vars, on=False)
         self.progress_bar.update(self.assignment)
 
         for ci, clause in enumerate(self.clauses):

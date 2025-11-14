@@ -20,6 +20,8 @@ import argparse
 from typing import Tuple, Iterable
 from encoder import to_cnf
 from solver import solve_cnf
+import time
+from solver import solve_cnf
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -77,3 +79,12 @@ def parse_dimacs(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
 
 if __name__ == "__main__":
     main()
+
+def main():
+    # ... parse puzzle, build clauses ...
+
+    start = time.perf_counter()
+    result, model = solve_cnf(clauses, num_vars)
+    end = time.perf_counter()
+
+    print(f"[TIME] Total runtime: {end - start:.3f} seconds")
