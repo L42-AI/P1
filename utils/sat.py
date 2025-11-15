@@ -2,7 +2,7 @@ from collections import deque
 from abc import abstractmethod, ABC
 import random as r
 
-from utils.progress_bar import ProgressBar
+# from utils.progress_bar import ProgressBar
 from utils.types import Clauses, Clause
 
 __all__ = [
@@ -11,6 +11,16 @@ __all__ = [
     'RandomPick',
     'HeuristicPick',
 ]
+
+class MockProgressBar:
+    def __init__(self, num_vars: int, on: bool = True):
+        pass
+
+    def update(self, assignment: dict[int, int]):
+        pass
+
+    def close(self):
+        pass
 
 class SATSolver(ABC):
     clauses: Clauses
@@ -22,7 +32,7 @@ class SATSolver(ABC):
     watches: dict[int, list[int]]
     prop_index: int
 
-    progress_bar: ProgressBar
+    progress_bar: MockProgressBar
 
     def __init__(self, clauses: Clauses, num_vars: int):
         """
@@ -49,7 +59,7 @@ class SATSolver(ABC):
         self.unit_clause_lits = deque()
 
         # Initialize progress bar
-        self.progress_bar = ProgressBar(num_vars, on=False)
+        self.progress_bar = MockProgressBar(num_vars, on=False)
         self.progress_bar.update(self.assignment)
 
         # Save clause indexes being watched
