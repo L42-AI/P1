@@ -49,6 +49,20 @@ class SATSolver:
         # 1 = True, -1 = False. Initieel gewoon allemaal True.
         self.phase: dict[int, int] = {i: 1 for i in range(1, num_vars + 1)}
 
+        # Jeroslow–Wang weights per literal sign
+        self.pos_weight: dict[int, float] = {i: 0.0 for i in range(1, num_vars + 1)}
+        self.neg_weight: dict[int, float] = {i: 0.0 for i in range(1, num_vars + 1)}
+
+        for clause in self.clauses:
+            # shorter clauses get higher weight
+            w = 2.0 ** (-len(clause))
+            for lit in clause:
+                v = abs(lit)
+                if lit > 0:
+                    self.pos_weight[v] += w
+                else:
+                    self.neg_weight[v] += w
+
     def assign(self, variable: int, value: int):
         var = abs(variable)
 
@@ -88,32 +102,33 @@ class SATSolver:
 
     def pick_unassigned_literal(self) -> int | None:
         """
-        Frequency + phase saving heuristic:
+        Jeroslow–Wang + phase saving:
 
-        - kies de nog niet geassigneerde variabele met de hoogste var_frequency
-          (dus die in de meeste clauses voorkomt).
-        - gebruik de laatst gebruikte "phase" (True/False) als sign:
-            * self.phase[var] == 1  -> probeer +var eerst
-            * self.phase[var] == -1 -> probeer -var eerst
+        - score(v) = pos_weight[v] + neg_weight[v]
+          (variables that occur in many short clauses get higher score)
+        - pick variable with highest score among unassigned vars
+        - polarity = last used phase (phase saving)
         """
 
         best_var = None
-        best_score = -1
+        best_score = -1.0
 
         for var, val in self.assignment.items():
             if val != 0:
-                continue  # al geassigned
+                continue  # already assigned
 
-            score = self.var_frequency.get(var, 0)
+            # JW score: positive + negative weight
+            score = self.pos_weight[var] + self.neg_weight[var]
             if score > best_score:
                 best_score = score
                 best_var = var
 
         if best_var is None:
-            return None  # alles geassigned
+            return None  # all assigned
 
-        # gebruik phase saving voor het sign
-        phase = self.phase.get(best_var, 1)  # default = +1
+        # use phase saving for sign (1 = True, -1 = False)
+        phase = self.phase.get(best_var, 1)
         return best_var * phase
+
 
 
