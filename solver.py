@@ -23,7 +23,7 @@ def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, Lis
     """
     solved, result = CDCL(clauses, num_vars).solve()
 
-    if solved == 'SAT':
-        n = int(round(num_vars ** (1/3)))
-        visualize_sudoku(result, n)
+    # if solved == 'SAT':
+    #     n = int(round(num_vars ** (1/3)))
+    #     visualize_sudoku(result, n)
     return solved, result
