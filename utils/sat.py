@@ -16,7 +16,7 @@ class SATSolver:
         self.unit_clause_lits = deque()
         self.prop_index = 0
 
-        self.progress_bar = ProgressBar(num_vars, on=False)
+        self.progress_bar = ProgressBar(num_vars, on=True)
         self.progress_bar.update(self.assignment)
 
         for ci, clause in enumerate(self.clauses):
@@ -45,13 +45,23 @@ class SATSolver:
                 v = abs(lit)
                 self.var_frequency[v] += 1
 
-
+        # Phase saving: onthoud de laatst gebruikte "richting" per variabele
+        # 1 = True, -1 = False. Initieel gewoon allemaal True.
+        self.phase: dict[int, int] = {i: 1 for i in range(1, num_vars + 1)}
 
     def assign(self, variable: int, value: int):
-        self.assignment[abs(variable)] = value
+        var = abs(variable)
 
+        # zet de assignment
+        self.assignment[var] = value
+
+        # phase saving: onthoud de laatst gebruikte kant (True/False)
+        self.phase[var] = value  # 1 voor True, -1 voor False
+
+        # trail voor backtracking
         self.assignment_trail.append(variable)
-        
+
+        # optioneel: voor performance kun je deze later uitzetten
         self.progress_bar.update(self.assignment)
 
     def unassign(self, var: int):
@@ -78,10 +88,13 @@ class SATSolver:
 
     def pick_unassigned_literal(self) -> int | None:
         """
-        Goedkope heuristic:
+        Frequency + phase saving heuristic:
+
         - kies de nog niet geassigneerde variabele met de hoogste var_frequency
           (dus die in de meeste clauses voorkomt).
-        - we nemen gewoon de positieve literal (True) als eerste keuze.
+        - gebruik de laatst gebruikte "phase" (True/False) als sign:
+            * self.phase[var] == 1  -> probeer +var eerst
+            * self.phase[var] == -1 -> probeer -var eerst
         """
 
         best_var = None
@@ -99,5 +112,8 @@ class SATSolver:
         if best_var is None:
             return None  # alles geassigned
 
-        return best_var  # positieve literal als decision
+        # gebruik phase saving voor het sign
+        phase = self.phase.get(best_var, 1)  # default = +1
+        return best_var * phase
+
 
