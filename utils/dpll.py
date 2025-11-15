@@ -1,9 +1,9 @@
 
 from utils.types import Clause
 
-from .sat import SATSolver
+from .sat import *
 
-class DPLL(SATSolver):
+class DPLL(FirstPick):
 
     def process_initial_unit_clauses(self) -> bool:
         while self.unit_clause_lits:

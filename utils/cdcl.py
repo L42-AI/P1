@@ -1,7 +1,7 @@
 from utils.types import Clauses
-from .sat import SATSolver
+from .sat import *
 
-class CDCL(SATSolver):
+class CDCL(FirstPick):
     def __init__(self, clauses: Clauses, num_vars: int):
         super().__init__(clauses, num_vars)
         self.reason_of = {var: None for var in range(1, num_vars + 1)}

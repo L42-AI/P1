@@ -1,10 +1,17 @@
 from collections import deque
+from abc import abstractmethod, ABC
 
 from utils.progress_bar import ProgressBar
 from utils.types import Clauses
 
+__all__ = [
+    'FirstPick',
+    'LastPick',
+    'RandomPick',
+    'HeuristicPick',
+]
 
-class SATSolver:
+class SATSolver(ABC):
     def __init__(self, clauses: Clauses, num_vars: int):
         self.clauses = [list(c) for c in clauses]
 
@@ -36,24 +43,14 @@ class SATSolver:
             self.watches[w1].append(ci)
             self.watches[w2].append(ci)
 
-        # Frequency heuristic: count how often each variable appears
-        self.var_frequency: dict[int, int] = {i: 0 for i in range(1, num_vars + 1)}
-        for clause in self.clauses:
-            for lit in clause:
-                v = abs(lit)
-                self.var_frequency[v] += 1
-
-        # Phase saving (no JW)
-        self.phase: dict[int, int] = {i: 1 for i in range(1, num_vars + 1)}
-
     def assign(self, variable: int, value: int):
         var = abs(variable)
 
         self.assignment[var] = value
-        self.phase[var] = value  # update phase saving
 
         self.assignment_trail.append(variable)
         self.progress_bar.update(self.assignment)
+        return var
 
     def unassign(self, var: int):
         if self.assignment[var] == 0:
@@ -73,6 +70,52 @@ class SATSolver:
     def lit_is_unassigned(self, lit: int) -> bool:
         return self.assignment[abs(lit)] == 0
 
+    @abstractmethod
+    def pick_unassigned_literal(self) -> int | None:
+        raise NotImplementedError
+
+class FirstPick(SATSolver):
+    def pick_unassigned_literal(self) -> int | None:
+        for var, val in self.assignment.items():
+            if val == 0:
+                return var  # always return positive literal
+        return None
+    
+class LastPick(SATSolver):
+    def pick_unassigned_literal(self) -> int | None:
+        for var, val in reversed(self.assignment.items()):
+            if val == 0:
+                return var  # always return positive literal
+        return None
+    
+class RandomPick(SATSolver):
+    import random
+
+    def pick_unassigned_literal(self) -> int | None:
+        unassigned_vars = [var for var, val in self.assignment.items() if val == 0]
+        if not unassigned_vars:
+            return None
+        return self.random.choice(unassigned_vars)
+
+class HeuristicPick(SATSolver):
+    def __init__(self, clauses: Clauses, num_vars: int):
+        super().__init__(clauses, num_vars)
+
+        # Frequency heuristic: count how often each variable appears
+        self.var_frequency: dict[int, int] = {i: 0 for i in range(1, num_vars + 1)}
+        for clause in self.clauses:
+            for lit in clause:
+                v = abs(lit)
+                self.var_frequency[v] += 1
+
+        # Phase saving (no JW)
+        self.phase: dict[int, int] = {i: 1 for i in range(1, num_vars + 1)}
+
+    def assign(self, variable: int, value: int):
+        var = super().assign(variable, value)
+        self.phase[var] = value
+        return var
+    
     def pick_unassigned_literal(self) -> int | None:
         """
         Frequency + phase saving heuristic:
